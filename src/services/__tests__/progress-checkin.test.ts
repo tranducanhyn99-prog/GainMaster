@@ -60,4 +60,56 @@ describe('Photo Progress Cycle Matcher & Gemini Vision AI Service', () => {
     expect(report.bodyFatTrend.length).toBeGreaterThan(5);
     expect(report.coachingRecommendation.length).toBeGreaterThan(10);
   });
+
+  it('attaches inlineData image parts when data URIs and API key are provided to Gemini Vision', async () => {
+    let capturedBody: any = null;
+    const fakeFetch = (async (_url: string, init?: RequestInit) => {
+      capturedBody = JSON.parse(String(init?.body));
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: JSON.stringify({
+                      frontAssessment: 'Cơ ngực nét hơn',
+                      backAssessment: 'Lưng xô rộng hơn',
+                      bodyFatTrend: 'Giảm 1.5% mỡ',
+                      coachingRecommendation: 'Giữ nguyên calo',
+                    }),
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      } as Response;
+    }) as unknown as typeof fetch;
+
+    const baselineWithDataUri: BodyCheckInEntry = {
+      ...mockEntries[0],
+      frontPhotoUri: 'data:image/jpeg;base64,AAAA',
+      backPhotoUri: 'data:image/jpeg;base64,BBBB',
+    };
+    const latestWithDataUri: BodyCheckInEntry = {
+      ...mockEntries[2],
+      frontPhotoUri: 'data:image/jpeg;base64,CCCC',
+      backPhotoUri: 'data:image/jpeg;base64,DDDD',
+    };
+
+    const report = await analyzeProgressPhotosWithAI({
+      baseline: baselineWithDataUri,
+      latest: latestWithDataUri,
+      goal: 'fat_loss',
+      apiKey: 'test-gemini-key',
+      fetchImpl: fakeFetch,
+    });
+
+    expect(report.source).toBe('gemini');
+    const parts = capturedBody.contents[0].parts;
+    expect(parts.some((p: any) => p.inlineData?.data === 'AAAA')).toBe(true);
+    expect(parts.some((p: any) => p.inlineData?.data === 'DDDD')).toBe(true);
+  });
 });

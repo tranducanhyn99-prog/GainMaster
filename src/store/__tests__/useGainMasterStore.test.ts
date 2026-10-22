@@ -36,4 +36,23 @@ describe('GainMaster Unified Store', () => {
     expect(report).not.toBeNull();
     expect(report?.frontAssessment.length).toBeGreaterThan(5);
   });
+
+  it('persists state changes to storage adapter via Zustand persist middleware', async () => {
+    const memoryStorage: Record<string, string> = {};
+    const customStorage = {
+      getItem: (name: string) => memoryStorage[name] ?? null,
+      setItem: (name: string, value: string) => {
+        memoryStorage[name] = value;
+      },
+      removeItem: (name: string) => {
+        delete memoryStorage[name];
+      },
+    };
+
+    const store = createGainMasterStore(undefined, customStorage);
+    store.getState().updateProfile({ name: 'Minh Khoa', goal: 'weight_gain' }, true);
+
+    expect(memoryStorage['gainmaster-storage']).toBeDefined();
+    expect(memoryStorage['gainmaster-storage']).toContain('Minh Khoa');
+  });
 });

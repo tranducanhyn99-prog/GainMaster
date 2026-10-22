@@ -71,4 +71,16 @@ describe('Evidence-Based Goal Workout Engine & Customizer', () => {
     const removed = removeExerciseFromSession(added, targetInstId);
     expect(removed.exercises.some((e: PlannedSessionExercise) => e.instanceId === targetInstId)).toBe(false);
   });
+
+  it('preserves fat_loss restSeconds when swapping exercises or toggling no-equipment mode', () => {
+    const fatLossSchedule = generateRecommendedWeeklySchedule('fat_loss', 3);
+    const session = fatLossSchedule.days.find((d: WorkoutSessionPlan) => !d.isRestDay)!;
+    // Exercise 1 is ex_legs_leg_press; its equipmentFree alternative is ex_legs_bulgarian_split_squat (fat_loss rest = 75s, muscle_gain rest = 90s)
+    const targetInstId = session.exercises[1].instanceId;
+    const swapped = swapSessionExercise(session, targetInstId, true);
+    expect(swapped.exercises[1].restSeconds).toBe(75);
+
+    const noEquip = toggleSessionNoEquipmentMode(session, true);
+    expect(noEquip.exercises[1].restSeconds).toBe(75);
+  });
 });

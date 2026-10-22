@@ -122,6 +122,7 @@ export interface PlannedSessionExercise {
 export interface WorkoutSessionPlan {
   dayOfWeek: number; // 0 = Monday ... 6 = Sunday
   dayLabel: string;
+  goal?: GoalType;
   isRestDay: boolean;
   sessionTitle: string;
   splitName: string;

@@ -246,7 +246,12 @@ export default function ProgressAIScreen() {
 
             <View style={styles.comparisonColumns}>
               {/* Baseline Milestone */}
-              <View style={styles.milestoneColumn}>
+              <View
+                style={[
+                  styles.milestoneColumn,
+                  { opacity: Math.max(0.35, (100 - compareRatio * 0.5) / 100) },
+                ]}
+              >
                 <View style={styles.milestoneMeta}>
                   <Text style={styles.milestoneDate}>{pair.baseline.dateIso.slice(0, 10)}</Text>
                   <Text style={styles.milestoneWeight}>{pair.baseline.weightKg} kg</Text>
@@ -260,7 +265,13 @@ export default function ProgressAIScreen() {
               </View>
 
               {/* Latest Milestone */}
-              <View style={[styles.milestoneColumn, styles.milestoneColumnLatest]}>
+              <View
+                style={[
+                  styles.milestoneColumn,
+                  styles.milestoneColumnLatest,
+                  { opacity: Math.max(0.35, (50 + compareRatio * 0.5) / 100) },
+                ]}
+              >
                 <View style={styles.milestoneMeta}>
                   <Text style={[styles.milestoneDate, { color: themeTokens.colors.primaryDark }]}>
                     {pair.latest.dateIso.slice(0, 10)}

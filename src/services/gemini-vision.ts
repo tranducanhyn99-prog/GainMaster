@@ -86,11 +86,37 @@ Hãy trả về đúng định dạng JSON gồm 4 trường tiếng Việt ng�
       trimmedKey
     )}`;
 
+    const parts: Array<
+      | { text: string }
+      | { inlineData: { mimeType: string; data: string } }
+    > = [{ text: prompt }];
+
+    const photoUris = [
+      baseline.frontPhotoUri,
+      baseline.backPhotoUri,
+      latest.frontPhotoUri,
+      latest.backPhotoUri,
+    ];
+
+    for (const uri of photoUris) {
+      if (uri && uri.startsWith('data:')) {
+        const match = uri.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          parts.push({
+            inlineData: {
+              mimeType: match[1],
+              data: match[2],
+            },
+          });
+        }
+      }
+    }
+
     const response = await fetchImpl(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ parts }],
         generationConfig: {
           responseMimeType: 'application/json',
         },

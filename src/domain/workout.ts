@@ -353,6 +353,7 @@ export function generateRecommendedWeeklySchedule(
       return {
         dayOfWeek,
         dayLabel,
+        goal,
         isRestDay: true,
         sessionTitle: 'Ngày nghỉ & Phục hồi cơ bắp',
         splitName: blueprint.splitSummaryVi,
@@ -377,6 +378,7 @@ export function generateRecommendedWeeklySchedule(
     return {
       dayOfWeek,
       dayLabel,
+      goal,
       isRestDay: false,
       sessionTitle: template.title,
       splitName: template.splitName,
@@ -469,9 +471,10 @@ export function swapSessionExercise(
         planned.exerciseId;
     }
 
+    const activeGoal = session.goal ?? 'muscle_gain';
     return createPlannedExercise(
       replacementId,
-      'muscle_gain',
+      activeGoal,
       idx,
       planned.sets,
       planned.targetReps,
@@ -496,6 +499,7 @@ export function toggleSessionNoEquipmentMode(
     };
   }
 
+  const activeGoal = session.goal ?? 'muscle_gain';
   const convertedExercises = session.exercises.map((planned, idx) => {
     if (['bodyweight', 'dumbbell', 'barbell'].includes(planned.equipment)) {
       return planned;
@@ -512,7 +516,7 @@ export function toggleSessionNoEquipmentMode(
 
     return createPlannedExercise(
       eqFreeId,
-      'muscle_gain',
+      activeGoal,
       idx,
       planned.sets,
       planned.targetReps,
@@ -533,9 +537,10 @@ export function addCustomExerciseToSession(
   sets = 3,
   reps = '10-12'
 ): WorkoutSessionPlan {
+  const activeGoal = session.goal ?? 'muscle_gain';
   const newExercise = createPlannedExercise(
     exerciseId,
-    'muscle_gain',
+    activeGoal,
     session.exercises.length + 1,
     sets,
     reps

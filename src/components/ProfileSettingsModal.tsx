@@ -14,7 +14,14 @@ import { calculateBMI } from '../domain/metrics';
 import { CYCLE_LABELS_VI } from '../services/progress-checkin';
 import { useGainMasterStore } from '../store/useGainMasterStore';
 import { themeTokens } from '../theme/tokens';
-import { GoalType, PhotoCycleType } from '../types/models';
+import { ActivityLevelType, GenderType, GoalType, PhotoCycleType } from '../types/models';
+
+const ACTIVITY_OPTIONS: { value: ActivityLevelType; label: string }[] = [
+  { value: 'sedentary', label: 'Ít vận động' },
+  { value: 'light', label: 'Nhẹ (1-2b)' },
+  { value: 'moderate', label: 'Vừa (3-4b)' },
+  { value: 'active', label: 'Năng động' },
+];
 
 const GOAL_OPTIONS: { value: GoalType; title: string; desc: string }[] = [
   {
@@ -45,6 +52,8 @@ export function ProfileSettingsModal() {
   const updateProfile = useGainMasterStore((s) => s.updateProfile);
 
   const [name, setName] = useState(profile.name);
+  const [gender, setGender] = useState<GenderType>(profile.gender);
+  const [activityLevel, setActivityLevel] = useState<ActivityLevelType>(profile.activityLevel);
   const [weightText, setWeightText] = useState(String(profile.weightKg));
   const [heightText, setHeightText] = useState(String(profile.heightCm));
   const [ageText, setAgeText] = useState(String(profile.age));
@@ -56,6 +65,8 @@ export function ProfileSettingsModal() {
   useEffect(() => {
     if (isOpen) {
       setName(profile.name);
+      setGender(profile.gender);
+      setActivityLevel(profile.activityLevel);
       setWeightText(String(profile.weightKg));
       setHeightText(String(profile.heightCm));
       setAgeText(String(profile.age));
@@ -75,6 +86,8 @@ export function ProfileSettingsModal() {
     updateProfile(
       {
         name: name.trim() || 'Người tập',
+        gender,
+        activityLevel,
         weightKg: parseFloat(weightText) || profile.weightKg,
         heightCm: parseFloat(heightText) || profile.heightCm,
         age: parseInt(ageText, 10) || profile.age,
@@ -175,6 +188,44 @@ export function ProfileSettingsModal() {
                   style={[styles.textInput, styles.tabularText]}
                 />
               </View>
+            </View>
+            <View style={styles.pillRow}>
+              {(['male', 'female'] as const).map((g) => (
+                <Pressable
+                  key={g}
+                  onPress={() => setGender(g)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Giới tính ${g === 'male' ? 'Nam' : 'Nữ'}`}
+                  style={[styles.segmentPill, gender === g && styles.segmentPillActive]}
+                >
+                  <Text style={[styles.segmentPillText, gender === g && styles.segmentPillTextActive]}>
+                    {g === 'male' ? 'Nam' : 'Nữ'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <View style={styles.pillRow}>
+              {ACTIVITY_OPTIONS.map((act) => (
+                <Pressable
+                  key={act.value}
+                  onPress={() => setActivityLevel(act.value)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mức độ vận động ${act.label}`}
+                  style={[
+                    styles.segmentPill,
+                    activityLevel === act.value && styles.segmentPillActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.segmentPillText,
+                      activityLevel === act.value && styles.segmentPillTextActive,
+                    ]}
+                  >
+                    {act.label}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </View>
 

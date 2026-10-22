@@ -1,4 +1,5 @@
 import { createStore, useStore } from 'zustand';
+import { createJSONStorage, persist, StateStorage } from 'zustand/middleware';
 import { calculateNutritionTargets, sanitizeProfileInput } from '../domain/metrics';
 import {
   calculateConsumedMacros,
@@ -124,7 +125,21 @@ export interface GainMasterState {
   runAIComparisonForCycle: (cycle: PhotoCycleType) => Promise<AIPhysiqueReport | null>;
 }
 
-export function createGainMasterStore(initialProfile: UserProfile = INITIAL_PROFILE) {
+const defaultMemoryStorage: Record<string, string> = {};
+const fallbackStateStorage: StateStorage = {
+  getItem: (name) => defaultMemoryStorage[name] ?? null,
+  setItem: (name, value) => {
+    defaultMemoryStorage[name] = value;
+  },
+  removeItem: (name) => {
+    delete defaultMemoryStorage[name];
+  },
+};
+
+export function createGainMasterStore(
+  initialProfile: UserProfile = INITIAL_PROFILE,
+  storageAdapter: StateStorage = fallbackStateStorage
+) {
   const safeProfile = sanitizeProfileInput(initialProfile);
   const initialTargets = calculateNutritionTargets(safeProfile);
   const initialMeals = generateDailyVietnameseMealPlan(initialTargets, 0);
@@ -133,211 +148,232 @@ export function createGainMasterStore(initialProfile: UserProfile = INITIAL_PROF
     safeProfile.workoutDaysPerWeek
   );
 
-  return createStore<GainMasterState>((set, get) => ({
-    profile: safeProfile,
-    nutritionTargets: initialTargets,
-    dailyMealPlan: initialMeals,
-    weeklySchedule: initialSchedule,
-    checkIns: SEED_CHECKINS,
-    latestAIReport: null,
-    isSettingsModalOpen: false,
+  return createStore<GainMasterState>()(
+    persist(
+      (set, get) => ({
+        profile: safeProfile,
+        nutritionTargets: initialTargets,
+        dailyMealPlan: initialMeals,
+        weeklySchedule: initialSchedule,
+        checkIns: SEED_CHECKINS,
+        latestAIReport: null,
+        isSettingsModalOpen: false,
 
-    setSettingsModalOpen: (open) => set({ isSettingsModalOpen: open }),
+        setSettingsModalOpen: (open) => set({ isSettingsModalOpen: open }),
 
-    updateProfile: (partial, regeneratePlans = true) => {
-      const merged = sanitizeProfileInput({ ...get().profile, ...partial });
-      const nextTargets = calculateNutritionTargets(merged);
-      const nextMealPlan = regeneratePlans
-        ? generateDailyVietnameseMealPlan(nextTargets, 0)
-        : get().dailyMealPlan;
-      const nextSchedule = regeneratePlans
-        ? generateRecommendedWeeklySchedule(merged.goal, merged.workoutDaysPerWeek)
-        : get().weeklySchedule;
+        updateProfile: (partial, regeneratePlans = true) => {
+          const merged = sanitizeProfileInput({ ...get().profile, ...partial });
+          const nextTargets = calculateNutritionTargets(merged);
+          const nextMealPlan = regeneratePlans
+            ? generateDailyVietnameseMealPlan(nextTargets, 0)
+            : get().dailyMealPlan;
+          const nextSchedule = regeneratePlans
+            ? generateRecommendedWeeklySchedule(merged.goal, merged.workoutDaysPerWeek)
+            : get().weeklySchedule;
 
-      set({
-        profile: merged,
-        nutritionTargets: nextTargets,
-        dailyMealPlan: nextMealPlan,
-        weeklySchedule: nextSchedule,
-      });
-    },
-
-    applyRecommendedSchedule: () => {
-      const { profile } = get();
-      set({
-        weeklySchedule: generateRecommendedWeeklySchedule(
-          profile.goal,
-          profile.workoutDaysPerWeek
-        ),
-      });
-    },
-
-    swapWorkoutDays: (fromDay, toDay) => {
-      set({
-        weeklySchedule: moveWorkoutSessionDay(get().weeklySchedule, fromDay, toDay),
-      });
-    },
-
-    toggleWorkoutNoEquipment: (dayOfWeek, enabled) => {
-      const schedule = get().weeklySchedule;
-      const updatedDays = schedule.days.map((session) =>
-        session.dayOfWeek === dayOfWeek
-          ? toggleSessionNoEquipmentMode(session, enabled)
-          : session
-      );
-      set({
-        weeklySchedule: {
-          ...schedule,
-          isCustomized: true,
-          days: updatedDays,
+          set({
+            profile: merged,
+            nutritionTargets: nextTargets,
+            dailyMealPlan: nextMealPlan,
+            weeklySchedule: nextSchedule,
+          });
         },
-      });
-    },
 
-    swapExerciseInDay: (dayOfWeek, exerciseInstanceId, preferEquipmentFree, specificReplacementId) => {
-      const schedule = get().weeklySchedule;
-      const updatedDays = schedule.days.map((session) =>
-        session.dayOfWeek === dayOfWeek
-          ? swapSessionExercise(
-              session,
-              exerciseInstanceId,
-              preferEquipmentFree,
-              specificReplacementId
-            )
-          : session
-      );
-      set({
-        weeklySchedule: {
-          ...schedule,
-          isCustomized: true,
-          days: updatedDays,
+        applyRecommendedSchedule: () => {
+          const { profile } = get();
+          set({
+            weeklySchedule: generateRecommendedWeeklySchedule(
+              profile.goal,
+              profile.workoutDaysPerWeek
+            ),
+          });
         },
-      });
-    },
 
-    addExerciseToDay: (dayOfWeek, exerciseId, sets = 3, reps = '10-12') => {
-      const schedule = get().weeklySchedule;
-      const updatedDays = schedule.days.map((session) =>
-        session.dayOfWeek === dayOfWeek
-          ? addCustomExerciseToSession(session, exerciseId, sets, reps)
-          : session
-      );
-      set({
-        weeklySchedule: {
-          ...schedule,
-          isCustomized: true,
-          days: updatedDays,
+        swapWorkoutDays: (fromDay, toDay) => {
+          set({
+            weeklySchedule: moveWorkoutSessionDay(get().weeklySchedule, fromDay, toDay),
+          });
         },
-      });
-    },
 
-    removeExerciseFromDay: (dayOfWeek, exerciseInstanceId) => {
-      const schedule = get().weeklySchedule;
-      const updatedDays = schedule.days.map((session) =>
-        session.dayOfWeek === dayOfWeek
-          ? removeExerciseFromSession(session, exerciseInstanceId)
-          : session
-      );
-      set({
-        weeklySchedule: {
-          ...schedule,
-          isCustomized: true,
-          days: updatedDays,
+        toggleWorkoutNoEquipment: (dayOfWeek, enabled) => {
+          const schedule = get().weeklySchedule;
+          const updatedDays = schedule.days.map((session) =>
+            session.dayOfWeek === dayOfWeek
+              ? toggleSessionNoEquipmentMode(session, enabled)
+              : session
+          );
+          set({
+            weeklySchedule: {
+              ...schedule,
+              isCustomized: true,
+              days: updatedDays,
+            },
+          });
         },
-      });
-    },
 
-    toggleSetCompleted: (dayOfWeek, exerciseInstanceId, setIndex, weightKg, repsDone) => {
-      const schedule = get().weeklySchedule;
-      const updatedDays = schedule.days.map((session) => {
-        if (session.dayOfWeek !== dayOfWeek) return session;
-        return {
-          ...session,
-          exercises: session.exercises.map((ex) => {
-            if (ex.instanceId !== exerciseInstanceId) return ex;
+        swapExerciseInDay: (
+          dayOfWeek,
+          exerciseInstanceId,
+          preferEquipmentFree,
+          specificReplacementId
+        ) => {
+          const schedule = get().weeklySchedule;
+          const updatedDays = schedule.days.map((session) =>
+            session.dayOfWeek === dayOfWeek
+              ? swapSessionExercise(
+                  session,
+                  exerciseInstanceId,
+                  preferEquipmentFree,
+                  specificReplacementId
+                )
+              : session
+          );
+          set({
+            weeklySchedule: {
+              ...schedule,
+              isCustomized: true,
+              days: updatedDays,
+            },
+          });
+        },
+
+        addExerciseToDay: (dayOfWeek, exerciseId, sets = 3, reps = '10-12') => {
+          const schedule = get().weeklySchedule;
+          const updatedDays = schedule.days.map((session) =>
+            session.dayOfWeek === dayOfWeek
+              ? addCustomExerciseToSession(session, exerciseId, sets, reps)
+              : session
+          );
+          set({
+            weeklySchedule: {
+              ...schedule,
+              isCustomized: true,
+              days: updatedDays,
+            },
+          });
+        },
+
+        removeExerciseFromDay: (dayOfWeek, exerciseInstanceId) => {
+          const schedule = get().weeklySchedule;
+          const updatedDays = schedule.days.map((session) =>
+            session.dayOfWeek === dayOfWeek
+              ? removeExerciseFromSession(session, exerciseInstanceId)
+              : session
+          );
+          set({
+            weeklySchedule: {
+              ...schedule,
+              isCustomized: true,
+              days: updatedDays,
+            },
+          });
+        },
+
+        toggleSetCompleted: (dayOfWeek, exerciseInstanceId, setIndex, weightKg, repsDone) => {
+          const schedule = get().weeklySchedule;
+          const updatedDays = schedule.days.map((session) => {
+            if (session.dayOfWeek !== dayOfWeek) return session;
             return {
-              ...ex,
-              setLogs: ex.setLogs.map((log, idx) => {
-                if (idx !== setIndex) return log;
+              ...session,
+              exercises: session.exercises.map((ex) => {
+                if (ex.instanceId !== exerciseInstanceId) return ex;
                 return {
-                  ...log,
-                  weightKg: weightKg !== undefined ? weightKg : log.weightKg,
-                  repsDone: repsDone !== undefined ? repsDone : log.repsDone,
-                  completed: !log.completed,
+                  ...ex,
+                  setLogs: ex.setLogs.map((log, idx) => {
+                    if (idx !== setIndex) return log;
+                    return {
+                      ...log,
+                      weightKg: weightKg !== undefined ? weightKg : log.weightKg,
+                      repsDone: repsDone !== undefined ? repsDone : log.repsDone,
+                      completed: !log.completed,
+                    };
+                  }),
                 };
               }),
             };
-          }),
-        };
-      });
+          });
 
-      set({
-        weeklySchedule: {
-          ...schedule,
-          days: updatedDays,
+          set({
+            weeklySchedule: {
+              ...schedule,
+              days: updatedDays,
+            },
+          });
         },
-      });
-    },
 
-    swapMealSlot: (slot, specificFoodId) => {
-      set({
-        dailyMealPlan: swapVietnameseMealItem(get().dailyMealPlan, slot, specificFoodId),
-      });
-    },
-
-    toggleMealCompleted: (slot) => {
-      const plan = get().dailyMealPlan;
-      set({
-        dailyMealPlan: {
-          ...plan,
-          meals: plan.meals.map((m) =>
-            m.slot === slot ? { ...m, completed: !m.completed } : m
-          ),
+        swapMealSlot: (slot, specificFoodId) => {
+          set({
+            dailyMealPlan: swapVietnameseMealItem(get().dailyMealPlan, slot, specificFoodId),
+          });
         },
-      });
-    },
 
-    regenerateMealPlanForDay: (dayIndex) => {
-      set({
-        dailyMealPlan: generateDailyVietnameseMealPlan(get().nutritionTargets, dayIndex),
-      });
-    },
-
-    getConsumedMacros: () => calculateConsumedMacros(get().dailyMealPlan),
-
-    addBodyCheckIn: (entry) => {
-      const newEntry: BodyCheckInEntry = {
-        ...entry,
-        id: `checkin_${Date.now()}`,
-      };
-      const updatedCheckIns = [...get().checkIns, newEntry];
-      set({
-        checkIns: updatedCheckIns,
-        profile: {
-          ...get().profile,
-          weightKg: entry.weightKg,
+        toggleMealCompleted: (slot) => {
+          const plan = get().dailyMealPlan;
+          set({
+            dailyMealPlan: {
+              ...plan,
+              meals: plan.meals.map((m) =>
+                m.slot === slot ? { ...m, completed: !m.completed } : m
+              ),
+            },
+          });
         },
-      });
-      return newEntry;
-    },
 
-    runAIComparisonForCycle: async (cycle) => {
-      const { checkIns, profile } = get();
-      const pair = findComparisonPairByCycle(checkIns, cycle);
-      if (!pair.baseline || !pair.latest) return null;
+        regenerateMealPlanForDay: (dayIndex) => {
+          set({
+            dailyMealPlan: generateDailyVietnameseMealPlan(get().nutritionTargets, dayIndex),
+          });
+        },
 
-      const report = await analyzeProgressPhotosWithAI({
-        baseline: pair.baseline,
-        latest: pair.latest,
-        goal: profile.goal,
-        cycle,
-        apiKey: profile.geminiApiKey,
-      });
+        getConsumedMacros: () => calculateConsumedMacros(get().dailyMealPlan),
 
-      set({ latestAIReport: report });
-      return report;
-    },
-  }));
+        addBodyCheckIn: (entry) => {
+          const newEntry: BodyCheckInEntry = {
+            ...entry,
+            id: `checkin_${Date.now()}`,
+          };
+          const updatedCheckIns = [...get().checkIns, newEntry];
+          set({
+            checkIns: updatedCheckIns,
+            profile: {
+              ...get().profile,
+              weightKg: entry.weightKg,
+            },
+          });
+          return newEntry;
+        },
+
+        runAIComparisonForCycle: async (cycle) => {
+          const { checkIns, profile } = get();
+          const pair = findComparisonPairByCycle(checkIns, cycle);
+          if (!pair.baseline || !pair.latest) return null;
+
+          const report = await analyzeProgressPhotosWithAI({
+            baseline: pair.baseline,
+            latest: pair.latest,
+            goal: profile.goal,
+            cycle,
+            apiKey: profile.geminiApiKey,
+          });
+
+          set({ latestAIReport: report });
+          return report;
+        },
+      }),
+      {
+        name: 'gainmaster-storage',
+        storage: createJSONStorage(() => storageAdapter),
+        partialize: (state) => ({
+          profile: state.profile,
+          nutritionTargets: state.nutritionTargets,
+          dailyMealPlan: state.dailyMealPlan,
+          weeklySchedule: state.weeklySchedule,
+          checkIns: state.checkIns,
+          latestAIReport: state.latestAIReport,
+        }),
+      }
+    )
+  );
 }
 
 export const gainMasterStore = createGainMasterStore();
