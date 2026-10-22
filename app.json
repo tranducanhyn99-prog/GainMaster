@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "GainMaster",
+    "slug": "gainmaster",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "gainmaster",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ducanh.gainmaster",
+      "infoPlist": {
+        "NSCameraUsageDescription": "GainMaster cần quyền Camera để chụp bộ ảnh thể trạng Mặt trước và Mặt sau theo chu kỳ.",
+        "NSPhotoLibraryUsageDescription": "GainMaster cần quyền Thư viện ảnh để chọn bộ ảnh thể trạng đối chiếu tiến độ."
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép GainMaster truy cập ảnh để lưu và phân tích thể trạng Mặt trước / Mặt sau."
+        }
+      ]
+    ]
+  }
+}
